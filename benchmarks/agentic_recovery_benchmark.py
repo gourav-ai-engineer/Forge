@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import subprocess
 import tempfile
@@ -62,15 +63,23 @@ def run_case() -> tuple[bool, float, dict[str, object]]:
         )
         planner: Planner = DeterministicRepairPlanner()
         started = time.perf_counter()
-        report = ForgeEngine(planner=planner, max_rounds=2).run(
-            ForgeTask(
-                request="Fix the failing calculator tests.",
-                repo_path=str(root),
-                max_steps=12,
-                require_approval_for_write=False,
-            ),
-            allow_writes=True,
-        )
+        previous_unsandboxed = os.environ.get("FORGE_ALLOW_UNSANDBOXED_TESTS")
+        os.environ["FORGE_ALLOW_UNSANDBOXED_TESTS"] = "1"
+        try:
+            report = ForgeEngine(planner=planner, max_rounds=2).run(
+                ForgeTask(
+                    request="Fix the failing calculator tests.",
+                    repo_path=str(root),
+                    max_steps=12,
+                    require_approval_for_write=False,
+                ),
+                allow_writes=True,
+            )
+        finally:
+            if previous_unsandboxed is None:
+                os.environ.pop("FORGE_ALLOW_UNSANDBOXED_TESTS", None)
+            else:
+                os.environ["FORGE_ALLOW_UNSANDBOXED_TESTS"] = previous_unsandboxed
         elapsed = (time.perf_counter() - started) * 1000
 
         final_code = (root / "calculator.py").read_text(encoding="utf-8")

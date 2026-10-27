@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.tox/
 .venv/
 venv/
 *.egg-info/
@@ -14,12 +15,16 @@ venv/
 .env.*
 !.env.example
 
-# Forge runtime state
+# Forge run state and vector index
 .forge/
+.forge_data/
 
-# Generated assistant output
-/data/progress.jsonl
-/generated/*.py
+# Build and test outputs
+build/
+dist/
+coverage.xml
+htmlcov/
+.coverage
 
 # IDE / OS
 .idea/

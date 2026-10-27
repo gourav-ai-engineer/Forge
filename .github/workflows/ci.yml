@@ -30,6 +30,10 @@ jobs:
         run: pytest -q
       - name: Offline inspection smoke test
         run: python forge_cli.py "Inspect the repository" --repo . --json
+      - name: Build sandbox image
+        run: docker build -f Dockerfile.sandbox -t forge-sandbox:local .
+      - name: Docker sandbox smoke test
+        run: python benchmarks/sandbox_smoke.py
       - name: Runtime safety benchmark
         run: python benchmarks/run_benchmark.py --json
       - name: Deterministic repair-loop benchmark

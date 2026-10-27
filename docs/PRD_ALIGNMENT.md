@@ -1,106 +1,60 @@
 # Forge PRD Alignment
 
-This document maps the **Autonomous Coding Agent & Secure Evaluation Sandbox** PRD to the current implementation. It is intentionally explicit about what is implemented versus what remains roadmap work, so project and resume claims stay defensible.
+This document distinguishes implemented functionality from roadmap work so feature and resume claims remain verifiable.
 
 ## Implemented now
 
-| PRD capability | Forge implementation |
+| Capability | Implementation and boundary |
 |---|---|
-| Bounded autonomous loop | `ForgeEngine` with configurable rounds and step budget |
-| Repository understanding | repository tree + repository profile analysis |
-| Typed agent tools | `ToolRegistry` with explicit read/write tool sets |
-| Safe code access | workspace-relative path resolution and traversal protection |
-| Approval-gated mutation | `write_file` and `git_commit` require authorization |
-| Validation | pytest / npm / Go test detection |
-| Failure-aware recovery | bounded planner rounds and final validation |
-| Persistent execution state | JSON reports under `.forge/runs` |
-| Model-backed planning | optional OpenAI Responses API provider |
-| Safety benchmark | deterministic checks for write/commit/path/credential boundaries |
-| Recovery benchmark | deterministic broken-fixture repair and final-test validation |
-| Sandboxed validation | hardened Docker runner for explicitly authorized mutation runs |
-| Safe portfolio demo | deterministic browser walkthrough; no arbitrary visitor execution |
+| Bounded autonomous loop | ForgeEngine limits rounds and steps and records every tool result |
+| Repository understanding | Language/profile summary, file tree, Git status and diff |
+| Typed tool use | Explicit tool names and structured arguments; no general-purpose shell tool |
+| Workspace security | Path traversal and symlink rejection, protected secret paths, ignored runtime directories |
+| Approval-gated mutation | File writes and commits require explicit authorization; commits require explicit file paths |
+| Code RAG | Line-aware chunks, offline BM25 retrieval, optional Chroma vector retrieval with reciprocal-rank fusion |
+| Model-backed planning | Optional OpenAI Responses API provider; offline planner remains available |
+| Validation | pytest, npm, and Go test-runner detection; host test execution skipped by default |
+| Sandboxed validation | Disposable Docker container, network disabled, limited privileges/resources, read-only checkout mount, tests run on a temporary copy |
+| Persistent run evidence | JSON reports under .forge/runs |
+| GitHub issue intake | Public issue URL parsing and title/body retrieval; user supplies a matching local checkout |
+| Guarded pull requests | Creates a branch and unmerged PR through GitHub API only after successful sandboxed validation |
+| Read-only service API | FastAPI health and run endpoints; optional API key and allowed workspace root |
+| CI and evaluation harness | Unit tests, static lint, offline smoke test, deterministic repair fixture, and runtime safety checks |
+| Safe browser demo | Fixed deterministic trace; no arbitrary visitor code or repository changes are executed |
 
-## Sandbox controls implemented
+## Important sandbox limitations
 
-The Docker runner is intentionally conservative:
+The configured example image is suitable for Forge's own Python test suite. Other projects may need a custom image with their test dependencies preinstalled. Forge does not build untrusted repository Dockerfiles on the host. The current controls reduce risk but are not equivalent to a hardened multi-tenant virtual machine; gVisor/Firecracker, seccomp/AppArmor profiles, stronger tenant isolation, and resource accounting remain future work.
 
-- network disabled with `--network=none`
-- all Linux capabilities dropped
-- `no-new-privileges`
-- read-only container root filesystem
-- bounded PID count
-- bounded memory
-- bounded CPU
-- ephemeral `--rm` container
-- temporary `tmpfs` for `/tmp`
-- controlled repository mount
-- no shell wrapping of the requested command
+The Docker test container has network disabled and reads the host checkout through a read-only bind mount. Its temporary copy is used for test execution so test-side writes do not alter the checkout through that mount.
 
-The sandbox image is configurable with `FORGE_SANDBOX_IMAGE`.
+## Remaining milestones
 
-### Important limitation
-
-A generic sandbox image cannot automatically contain every repository's dependency graph. Production deployments should use purpose-built, pinned images with dependencies prepared ahead of time. Building an untrusted repository's Dockerfile on the host is **not** considered a safe sandbox strategy.
-
-## Next milestones
-
-### Phase 1 — Issue intake
-
-- GitHub issue URL/number parsing
-- repository/commit pinning
-- normalized task object
-- read-only GitHub metadata client
-
-### Phase 2 — Code intelligence
-
-- tree-sitter parsing
-- symbol index
-- AST-aware search
+### Code intelligence
+- AST/tree-sitter symbol index
 - test-to-source mapping
-- BM25/embedding retrieval
+- smarter retrieval evaluation and reranking
+- curated retrieval relevance dataset
 
-### Phase 3 — Evidence and review
+### Evidence and evaluation
+- event stream beyond JSON run reports
+- structured before/after patch artifacts
+- failure classification and patch-risk scoring
+- curated bug-fix evaluation set, hidden regression tests, success/iteration/cost/latency reporting
+- model and policy comparisons with reproducible evidence
 
-- structured trajectory events
-- patch artifact storage
-- before/after test summary
-- failure classification
-- patch risk score
-- evidence bundle export
-
-### Phase 4 — Secure execution hardening
-
-- pinned sandbox images
-- package-cache strategy
-- seccomp/AppArmor profiles
-- stronger isolation using gVisor or Firecracker
-- resource accounting and artifact quotas
-
-### Phase 5 — GitHub workflow
-
-- branch creation
-- PR-ready patch generation
-- optional human approval checkpoint
-- PR description generation
-- no automatic merge by default
-
-### Phase 6 — Research evaluation
-
-- curated bug benchmark
-- hidden regression tests
-- pass@1 / pass@k
-- resolved rate
-- regression rate
-- iteration/runtime/token metrics
-- trajectory quality scoring
-- model and policy comparison
+### Security and operations
+- stronger OS-level isolation and seccomp/AppArmor profiles
+- pinned dependency images and custom repository test environments
+- rate limits, quotas and artifact retention for multi-tenant service deployment
+- deeper API integration tests and production deployment monitoring
 
 ## Engineering principles
 
-1. **Verification over generation:** a patch is not successful merely because code was produced.
-2. **Least privilege:** read-only is the default; mutations are explicitly authorized.
-3. **Untrusted repository:** repository code and tool output are treated as data, not trusted instructions.
-4. **Bounded autonomy:** every loop has explicit step and round limits.
-5. **Reproducibility:** benchmarks must be deterministic where possible and retain raw results.
-6. **Honest measurement:** no model-quality or SWE-bench numbers are claimed without an actual benchmark run.
-7. **Human review:** automatic merge/deploy is outside the MVP safety boundary.
+1. Verification over generation: generated code is not success until validation passes.
+2. Least privilege: read-only is the default; mutations are explicitly authorized.
+3. Untrusted repository: source code and tool output are data, not trusted instructions.
+4. Bounded autonomy: every planner loop has step and round limits.
+5. Reproducibility: keep benchmark fixtures deterministic and retain raw results.
+6. Honest measurement: no SWE-bench or model-quality scores are claimed without running a defined evaluation.
+7. Human review: Forge opens pull requests only when explicitly requested and never auto-merges.

@@ -1,0 +1,18 @@
+# Forge Sandbox
+services:
+  forge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    environment:
+      - FORGE_WORKSPACE=/workspace/repository
+    volumes:
+      - ./repository:/workspace/repository:rw
+    read_only: false
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m

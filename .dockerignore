@@ -1,0 +1,16 @@
+.git/
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.forge/
+.forge_data/
+repository/
+build/
+dist/
+*.pyc

@@ -9,7 +9,7 @@ from .types import ToolResult
 
 
 class SandboxRunner:
-    """Run validation commands inside a hardened, disposable Docker container."""
+    """Run repository validation in a disposable, network-isolated Docker copy."""
 
     def __init__(
         self,
@@ -21,7 +21,7 @@ class SandboxRunner:
         pids_limit: int = 128,
     ) -> None:
         self.workspace = workspace.resolve()
-        self.image = image or os.getenv("FORGE_SANDBOX_IMAGE", "python:3.12-slim")
+        self.image = image or os.getenv("FORGE_SANDBOX_IMAGE", "forge-sandbox:local")
         self.memory = memory
         self.cpus = cpus
         self.pids_limit = pids_limit
@@ -33,28 +33,35 @@ class SandboxRunner:
         if docker is None:
             return ToolResult(False, "", "sandbox unavailable: Docker CLI not found")
 
+        # The source repository is mounted read-only. Tests execute on a disposable
+        # copy under the container's bounded tmpfs, so test code cannot mutate the
+        # user's checkout through the bind mount.
+        copy_and_run = (
+            "import os, pathlib, shutil, subprocess, sys; "
+            "src=pathlib.Path('/source'); dst=pathlib.Path('/tmp/forge-workspace'); "
+            "shutil.copytree(src, dst, dirs_exist_ok=True, "
+            "ignore=shutil.ignore_patterns('.git','.forge','.venv','venv',"
+            "'node_modules','__pycache__','.pytest_cache','.ruff_cache')); "
+            "env={k:v for k,v in os.environ.items() if k in "
+            "{'PATH','HOME','LANG','LC_ALL','TMPDIR','TEMP','TMP'}}; "
+            "env['PYTHONDONTWRITEBYTECODE']='1'; "
+            "result=subprocess.run(sys.argv[1:], cwd=dst, env=env, check=False); "
+            "sys.exit(result.returncode)"
+        )
         container_command = [
-            docker,
-            "run",
-            "--rm",
+            docker, "run", "--rm",
             "--network=none",
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
             "--read-only",
-            "--pids-limit",
-            str(self.pids_limit),
-            "--memory",
-            self.memory,
-            "--cpus",
-            self.cpus,
-            "--tmpfs",
-            "/tmp:rw,nosuid,nodev,noexec,size=128m",
-            "--mount",
-            f"type=bind,src={self.workspace},dst=/workspace,rw",
-            "--workdir",
-            "/workspace",
+            "--pids-limit", str(self.pids_limit),
+            "--memory", self.memory,
+            "--cpus", self.cpus,
+            "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m",
+            "--mount", f"type=bind,src={self.workspace},dst=/source,readonly",
+            "--workdir", "/tmp",
             self.image,
-            *command,
+            "python", "-c", copy_and_run, *command,
         ]
         try:
             proc = subprocess.run(
@@ -79,6 +86,7 @@ class SandboxRunner:
                 "sandbox": True,
                 "image": self.image,
                 "network": "none",
+                "read_only_source": True,
                 "memory": self.memory,
                 "cpus": self.cpus,
             },

@@ -1,4 +1,4 @@
 python-dotenv>=1.0,<2
 requests>=2.32,<3
-schedule>=1.2,<2
-pytest>=8.3,<9
+fastapi>=0.115,<1
+uvicorn>=0.30,<1

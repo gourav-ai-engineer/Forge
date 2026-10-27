@@ -7,7 +7,7 @@ services:
     environment:
       FORGE_WORKSPACE: /workspace/repository
       FORGE_ALLOWED_ROOT: /workspace
-      FORGE_API_KEY: \${FORGE_API_KEY:?Set FORGE_API_KEY in .env before starting Compose}
+      FORGE_API_KEY: ${FORGE_API_KEY:?Set FORGE_API_KEY in .env before starting Compose}
     ports:
       - "127.0.0.1:8787:8787"
     volumes:

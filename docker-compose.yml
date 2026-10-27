@@ -1,18 +1,21 @@
-# Forge Sandbox
 services:
   forge:
     build:
       context: .
       dockerfile: Dockerfile
-    working_dir: /workspace
+    command: ["--serve", "--repo", "/workspace/repository", "--host", "0.0.0.0", "--port", "8787"]
     environment:
-      - FORGE_WORKSPACE=/workspace/repository
+      FORGE_WORKSPACE: /workspace/repository
+      FORGE_ALLOWED_ROOT: /workspace
+      FORGE_API_KEY: \${FORGE_API_KEY:?Set FORGE_API_KEY in .env before starting Compose}
+    ports:
+      - "127.0.0.1:8787:8787"
     volumes:
       - ./repository:/workspace/repository:rw
-    read_only: false
+    read_only: true
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
     tmpfs:
-      - /tmp:size=256m
+      - /tmp:rw,nosuid,nodev,size=256m

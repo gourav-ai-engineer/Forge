@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from forge.engine import ForgeEngine
 from forge.github import fetch_issue
 from forge.providers import provider_from_env
@@ -13,6 +15,7 @@ from forge.workspace import Workspace
 
 
 def main() -> None:
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Forge — autonomous software engineer")
     parser.add_argument("request", nargs="?", default="Inspect this repository and run its tests.")
     parser.add_argument("--repo", default=".", help="local repository/workspace path")

@@ -9,7 +9,7 @@ from .types import ToolResult
 
 
 class SandboxRunner:
-    """Run repository validation in a disposable, network-isolated Docker copy."""
+    """Run validation in a disposable, network-isolated Docker copy."""
 
     def __init__(
         self,
@@ -33,21 +33,52 @@ class SandboxRunner:
         if docker is None:
             return ToolResult(False, "", "sandbox unavailable: Docker CLI not found")
 
-        # The source repository is mounted read-only. Tests execute on a disposable
-        # copy under the container's bounded tmpfs, so test code cannot mutate the
-        # user's checkout through the bind mount.
-        copy_and_run = (
-            "import os, pathlib, shutil, subprocess, sys; "
-            "src=pathlib.Path('/source'); dst=pathlib.Path('/tmp/forge-workspace'); "
-            "shutil.copytree(src, dst, dirs_exist_ok=True, "
-            "ignore=shutil.ignore_patterns('.git','.forge','.venv','venv',"
-            "'node_modules','__pycache__','.pytest_cache','.ruff_cache')); "
-            "env={k:v for k,v in os.environ.items() if k in "
-            "{'PATH','HOME','LANG','LC_ALL','TMPDIR','TEMP','TMP'}}; "
-            "env['PYTHONDONTWRITEBYTECODE']='1'; "
-            "result=subprocess.run(sys.argv[1:], cwd=dst, env=env, check=False); "
-            "sys.exit(result.returncode)"
-        )
+        # Run on an ephemeral copy. The mount remains read-only; common secret
+        # files and credential directories never enter the disposable copy.
+        copy_and_run = r"""
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+
+src = pathlib.Path("/source")
+dst = pathlib.Path("/tmp/forge-workspace")
+ignored_dirs = {
+    ".git", ".forge", ".venv", "venv", "node_modules", "__pycache__",
+    ".pytest_cache", ".ruff_cache", ".mypy_cache", ".tox", ".aws", ".ssh", ".kube",
+}
+protected_names = {
+    ".env", "id_rsa", "id_ed25519", ".git-credentials", "credentials.json",
+    "secrets.json",
+}
+protected_suffixes = (".pem", ".key", ".p12", ".pfx")
+
+
+def ignore(_directory, names):
+    blocked = []
+    for name in names:
+        lowered = name.casefold()
+        if lowered in ignored_dirs or lowered in protected_names:
+            blocked.append(name)
+        elif lowered.startswith(".env.") and lowered != ".env.example":
+            blocked.append(name)
+        elif lowered.endswith(protected_suffixes):
+            blocked.append(name)
+        elif "credentials" in lowered or "secrets" in lowered:
+            blocked.append(name)
+    return blocked
+
+
+shutil.copytree(src, dst, dirs_exist_ok=True, ignore=ignore)
+env = {
+    k: v for k, v in os.environ.items()
+    if k in {"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP"}
+}
+env["PYTHONDONTWRITEBYTECODE"] = "1"
+result = subprocess.run(sys.argv[1:], cwd=dst, env=env, check=False)
+sys.exit(result.returncode)
+"""
         container_command = [
             docker, "run", "--rm",
             "--network=none",
@@ -87,6 +118,7 @@ class SandboxRunner:
                 "image": self.image,
                 "network": "none",
                 "read_only_source": True,
+                "secret_filtering": True,
                 "memory": self.memory,
                 "cpus": self.cpus,
             },

@@ -39,6 +39,8 @@ class ForgeEngine:
         validations = [step for step in records if step.tool == "run_tests"]
         if not validations or not validations[-1].ok:
             return False
+        if validations[-1].output.startswith("SKIPPED:"):
+            return False
         non_recoverable_failures = [
             step for step in records
             if not step.ok and step.tool != "run_tests"
@@ -68,11 +70,16 @@ class ForgeEngine:
         self._execute(registry, baseline, records, 1)
 
         if isinstance(planner, OfflinePlanner):
-            ok = all(step.ok for step in records)
+            validations = [step for step in records if step.tool == "run_tests"]
+            tests_skipped = bool(validations and validations[-1].output.startswith("SKIPPED:"))
+            ok = all(step.ok for step in records if not (step.tool == "run_tests" and tests_skipped))
+            if ok and tests_skipped:
+                summary = "Offline inspection completed; tests were skipped because sandbox execution is disabled."
+            else:
+                summary = "Offline inspect/test cycle completed." if ok else "Baseline validation failed."
             return self._finish(
                 RunReport(task_id, RunStatus.SUCCEEDED if ok else RunStatus.FAILED,
-                          "Offline inspect/test cycle completed." if ok else "Baseline validation failed.",
-                          tuple(records), started_at, RunReport.timestamp()), workspace)
+                          summary, tuple(records), started_at, RunReport.timestamp()), workspace)
 
         next_index = len(records) + 1
         rounds = 0

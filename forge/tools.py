@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 
 from .analyzer import analyze_repository
 from .retrieval import CodeRetriever
@@ -132,6 +133,20 @@ class ToolRegistry:
             return staged
         return self.workspace.run(["git", "commit", "-m", message])
 
+    def _clear_python_bytecode(self) -> None:
+        """Prevent stale timestamp-based .pyc files from masking freshly written source."""
+        ignored = {".git", ".forge", ".venv", "venv", "node_modules", "site-packages"}
+        for current, directories, _ in os.walk(self.workspace.root, topdown=True, followlinks=False):
+            directories[:] = [
+                name for name in directories
+                if name.casefold() not in ignored and not (Path(current) / name).is_symlink()
+            ]
+            if "__pycache__" in directories:
+                cache_dir = Path(current) / "__pycache__"
+                directories.remove("__pycache__")
+                if not cache_dir.is_symlink():
+                    shutil.rmtree(cache_dir, ignore_errors=True)
+
     def _run_tests(self) -> ToolResult:
         if (self.workspace.root / "pyproject.toml").exists() or (self.workspace.root / "pytest.ini").exists():
             command = ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"]
@@ -142,6 +157,9 @@ class ToolRegistry:
         else:
             return ToolResult(True, "SKIPPED: no supported test runner detected; inspection only.")
 
+        # A prior baseline run may have created timestamp-based bytecode. Clear it
+        # before validation so same-size edits made within one second are actually tested.
+        self._clear_python_bytecode() if command[0] == "python" else None
         if self.sandbox_runner is not None:
             return self.sandbox_runner.run(command, timeout_seconds=180)
         if os.getenv("FORGE_ALLOW_UNSANDBOXED_TESTS") != "1":

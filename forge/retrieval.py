@@ -50,7 +50,7 @@ class CodeRetriever:
 
     @staticmethod
     def _tokens(text: str) -> tuple[str, ...]:
-        return tuple(token.casefold() for token in TOKEN_RE.findall(text))
+        return tuple(part.casefold() for token in TOKEN_RE.findall(text) for part in token.split("_") if len(part) > 1)
 
     def _build(self) -> list[CodeChunk]:
         if self._chunks is not None:

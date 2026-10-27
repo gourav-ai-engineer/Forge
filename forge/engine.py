@@ -24,8 +24,16 @@ class ForgeEngine:
         for index, call in enumerate(calls, start=offset):
             started = time.perf_counter()
             result = registry.execute(call)
-            records.append(StepRecord(index, call.name, result.ok, result.output if result.ok else result.error,
-                                      (time.perf_counter() - started) * 1000))
+            output = result.output
+            if result.error:
+                output = f"{output}\nERROR: {result.error}".strip()
+            records.append(StepRecord(
+                index,
+                call.name,
+                result.ok,
+                output,
+                (time.perf_counter() - started) * 1000,
+            ))
 
     def _finish(self, report: RunReport, workspace: Workspace) -> RunReport:
         RunStore(workspace.root / self.state_dir).save(report)

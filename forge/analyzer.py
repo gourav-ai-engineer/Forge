@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .workspace import Workspace
+
 
 @dataclass(frozen=True)
 class RepositoryProfile:
@@ -16,8 +18,8 @@ class RepositoryProfile:
 
 def analyze_repository(root: str | Path) -> RepositoryProfile:
     base = Path(root).resolve()
-    files = [p for p in base.rglob("*") if p.is_file() and ".git" not in p.parts]
-    suffixes = {p.suffix.lower() for p in files}
+    files = Workspace(base).list_files(limit=2_000)
+    suffixes = {Path(name).suffix.casefold() for name in files}
     languages: list[str] = []
     if ".py" in suffixes:
         languages.append("python")
@@ -31,6 +33,10 @@ def analyze_repository(root: str | Path) -> RepositoryProfile:
         languages.append("rust")
     if ".cpp" in suffixes or ".cc" in suffixes:
         languages.append("cpp")
+    if ".java" in suffixes:
+        languages.append("java")
+    if ".sql" in suffixes:
+        languages.append("sql")
 
     test_command = None
     build_command = None
@@ -38,6 +44,9 @@ def analyze_repository(root: str | Path) -> RepositoryProfile:
         test_command = ("python", "-m", "pytest", "-q")
     elif (base / "package.json").exists():
         test_command = ("npm", "test", "--", "--runInBand")
+    elif (base / "go.mod").exists():
+        test_command = ("go", "test", "./...")
+
     if (base / "pyproject.toml").exists():
         build_command = ("python", "-m", "build")
     elif (base / "package.json").exists():

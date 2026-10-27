@@ -77,7 +77,7 @@ class CodeRetriever:
                 start_line = start + 1
                 end_line = min(start + window, len(lines))
                 digest = hashlib.sha1(
-                    f"{relative}:{start_line}:{snippet}".encode("utf-8")
+                    f"{relative}:{start_line}:{snippet}".encode()
                 ).hexdigest()
                 chunks.append(CodeChunk(
                     chunk_id=digest,
@@ -112,7 +112,7 @@ class CodeRetriever:
         avg_length = max(sum(lengths) / total_docs, 1.0)
         k1, b = 1.5, 0.75
         scored: list[tuple[CodeChunk, float]] = []
-        for chunk, counts, length in zip(chunks, token_counts, lengths):
+        for chunk, counts, length in zip(chunks, token_counts, lengths, strict=False):
             score = 0.0
             for token in query_tokens:
                 tf = counts.get(token, 0)

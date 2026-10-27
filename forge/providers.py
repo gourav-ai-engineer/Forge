@@ -11,7 +11,7 @@ from .types import ForgeTask, ToolCall
 class OpenAIPlanner:
     """Optional model-backed planner using the OpenAI Responses API."""
 
-    model: str = "gpt-5.6-luna"
+    model: str = "gpt-4o-mini"
 
     def plan(self, task: ForgeTask, context: str) -> tuple[ToolCall, ...]:
         try:
@@ -41,5 +41,5 @@ class OpenAIPlanner:
 
 def provider_from_env() -> OpenAIPlanner | None:
     if os.getenv("OPENAI_API_KEY"):
-        return OpenAIPlanner(model=os.getenv("FORGE_MODEL", "gpt-5.6-luna"))
+        return OpenAIPlanner(model=os.getenv("FORGE_MODEL", "gpt-4o-mini"))
     return None

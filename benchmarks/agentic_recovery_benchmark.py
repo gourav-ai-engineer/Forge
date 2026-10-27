@@ -106,6 +106,12 @@ def run_case() -> tuple[bool, float, dict[str, object]]:
             "write_executed": any(step.tool == "write_file" and step.ok for step in report.steps),
             "diff_reviewed": any(step.tool == "git_diff" and step.ok for step in report.steps),
             "external_final_tests_exit_code": final_tests.returncode,
+            "last_test_output": test_steps[-1].output if test_steps else "NO_TEST_STEP",
+            "final_calculator_source": final_code,
+            "step_results": [
+                {"tool": step.tool, "ok": step.ok, "output": step.output[-1000:]}
+                for step in report.steps
+            ],
             "summary": report.summary,
         }
         return passed, elapsed, detail

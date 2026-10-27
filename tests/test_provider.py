@@ -7,12 +7,12 @@ from forge.providers import OpenAIPlanner, provider_from_env
 from forge.types import ForgeTask
 
 
-def test_provider_from_env_selects_luna(monkeypatch) -> None:
+def test_provider_from_env_selects_default_model(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.delenv("FORGE_MODEL", raising=False)
     planner = provider_from_env()
     assert isinstance(planner, OpenAIPlanner)
-    assert planner.model == "gpt-5.6-luna"
+    assert planner.model == "gpt-4o-mini"
 
 
 def test_openai_planner_parses_responses_output(monkeypatch) -> None:
@@ -41,5 +41,5 @@ def test_openai_planner_parses_responses_output(monkeypatch) -> None:
     )
 
     assert result[0].name == "repo_tree"
-    assert calls[0]["model"] == "gpt-5.6-luna"
+    assert calls[0]["model"] == "gpt-4o-mini"
     assert "Inspect the repository" in calls[0]["input"]

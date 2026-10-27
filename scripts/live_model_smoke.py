@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -25,10 +26,18 @@ def main() -> int:
             max_steps=14,
             require_approval_for_write=False,
         )
-        report = ForgeEngine(planner=OpenAIPlanner(), max_rounds=3).run(
-            task,
-            allow_writes=True,
-        )
+        previous_unsandboxed = os.environ.get("FORGE_ALLOW_UNSANDBOXED_TESTS")
+        os.environ["FORGE_ALLOW_UNSANDBOXED_TESTS"] = "1"
+        try:
+            report = ForgeEngine(planner=OpenAIPlanner(), max_rounds=3).run(
+                task,
+                allow_writes=True,
+            )
+        finally:
+            if previous_unsandboxed is None:
+                os.environ.pop("FORGE_ALLOW_UNSANDBOXED_TESTS", None)
+            else:
+                os.environ["FORGE_ALLOW_UNSANDBOXED_TESTS"] = previous_unsandboxed
         print(f"status={report.status.value}")
         for step in report.steps:
             print(f"{step.index:02d} {step.tool} {'OK' if step.ok else 'ERROR'}")

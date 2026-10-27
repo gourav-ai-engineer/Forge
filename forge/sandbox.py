@@ -44,6 +44,8 @@ import sys
 
 src = pathlib.Path("/source")
 dst = pathlib.Path("/tmp/forge-workspace")
+home = pathlib.Path("/tmp/forge-home")
+home.mkdir(mode=0o700, parents=True, exist_ok=True)
 ignored_dirs = {
     ".git", ".forge", ".venv", "venv", "node_modules", "__pycache__",
     ".pytest_cache", ".ruff_cache", ".mypy_cache", ".tox", ".aws", ".ssh", ".kube",
@@ -73,8 +75,9 @@ def ignore(_directory, names):
 shutil.copytree(src, dst, dirs_exist_ok=True, ignore=ignore)
 env = {
     k: v for k, v in os.environ.items()
-    if k in {"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP"}
+    if k in {"PATH", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP"}
 }
+env["HOME"] = str(home)
 env["PYTHONDONTWRITEBYTECODE"] = "1"
 result = subprocess.run(sys.argv[1:], cwd=dst, env=env, check=False)
 sys.exit(result.returncode)
@@ -94,6 +97,14 @@ sys.exit(result.returncode)
             self.image,
             "python", "-c", copy_and_run, *command,
         ]
+        # Matching the caller's Unix identity allows read access to owner-only
+        # workspaces without restoring CAP_DAC_OVERRIDE. The sandbox copy and
+        # all test writes stay inside the disposable container tmpfs.
+        if os.name != "nt" and hasattr(os, "getuid") and hasattr(os, "getgid"):
+            image_index = container_command.index(self.image)
+            container_command[image_index:image_index] = [
+                "--user", f"{os.getuid()}:{os.getgid()}",
+            ]
         try:
             proc = subprocess.run(
                 container_command,

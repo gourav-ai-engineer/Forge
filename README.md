@@ -132,7 +132,7 @@ When FORGE_API_KEY is set, include the X-API-Key header. Binding to a non-local 
 
 ## Docker Compose API
 
-Copy .env.example to .env, set a non-empty FORGE_API_KEY, and create a local repository folder containing the checkout you want to inspect. Then run:
+Copy .env.example to .env, set a non-empty FORGE_API_KEY, optionally set OPENAI_API_KEY for model-backed planning, and create a local repository folder containing the checkout you want to inspect. Without OPENAI_API_KEY, the service uses the offline planner. Then run:
 
     docker compose up --build
 
